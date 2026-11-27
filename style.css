@@ -361,9 +361,9 @@ html,body{height:100%;overflow:hidden;overscroll-behavior:none}
 .r5 .ext>:nth-child(4n+1){justify-content:flex-start;font-weight:700}
 
 /* --- Pastki 4 tugma va mikrofon bir-biriga tegmasin --- */
-.nav4{gap:8px;padding-right:74px}
+.nav4{gap:8px}
 .nav4 button{border:1px solid color-mix(in srgb,#3b82f6 45%,var(--line));box-shadow:0 0 14px -5px rgba(59,130,246,.65);padding:13px 2px;font-size:12px;min-height:50px}
-@media(min-width:700px){.nav4{padding-right:0}}
+
 
 /* --- tuzatishlar: 1-qator nomlari kesilmasin, 6-qator sarlavhasi ko'rinsin --- */
 .t1 .th,.t1 .tr{grid-template-columns:minmax(104px,1.6fr) repeat(4,minmax(0,1fr))}
