@@ -293,8 +293,12 @@ const APP_NAME = "Go‘sht hisobi";
   const DEVICE = Math.random().toString(36).slice(2);
   const SKIP = k => k.startsWith("firebase") || k.startsWith("__sync");
   let db, ref, timer, applying = false;
-  const snap = () => { const o = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (!SKIP(k)) o[k] = localStorage.getItem(k); } return JSON.stringify(o); };
-  function push() { clearTimeout(timer); timer = setTimeout(() => { if (!applying) ref.set({ data: snap(), device: DEVICE, t: Date.now() }).catch(console.error); }, 1500); }
+  /* Muhim: kalitlar HAR DOIM bir xil (alifbo) tartibda yig'iladi. iPhone/iPad Safari localStorage tartibini o'zgartirib yuboradi,
+     shu sabab ilova "bir xil ma'lumot boshqacha ekan" deb o'ylab sahifani cheksiz qayta yuklardi (miltillash). */
+  const snap = () => { const ks = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (!SKIP(k)) ks.push(k); } ks.sort(); const o = {}; ks.forEach(k => { o[k] = localStorage.getItem(k); }); return JSON.stringify(o); };
+  const canon = j => { try { const o = JSON.parse(j), r = {}; Object.keys(o).sort().forEach(k => { r[k] = o[k]; }); return JSON.stringify(r); } catch (e) { return j; } };
+  let lastSync = "";
+  function push() { clearTimeout(timer); timer = setTimeout(() => { if (applying) return; const cur = snap(); if (cur === lastSync) return; lastSync = cur; ref.set({ data: cur, device: DEVICE, t: Date.now() }).catch(console.error); }, 1500); }
   function apply(json) {
     applying = true;
     const o = JSON.parse(json);
@@ -307,13 +311,24 @@ const APP_NAME = "Go‘sht hisobi";
     const s = await ref.get();
     if (s.exists) {
       const remote = s.data().data;
-      if (remote !== snap()) { apply(remote); if (!sessionStorage.__syncReload) { sessionStorage.__syncReload = 1; try { sessionStorage.__sync_pinskip = "1"; } catch (x) {} location.reload(); return false; } }
-    } else { await ref.set({ data: snap(), device: DEVICE, t: Date.now() }); }
+      lastSync = canon(remote);
+      if (canon(remote) !== snap()) { apply(remote); if (!sessionStorage.__syncReload) { sessionStorage.__syncReload = 1; try { sessionStorage.__sync_pinskip = "1"; } catch (x) {} location.reload(); return false; } }
+    } else { lastSync = snap(); await ref.set({ data: lastSync, device: DEVICE, t: Date.now() }); }
     delete sessionStorage.__syncReload;
     const ss = Storage.prototype.setItem, rs = Storage.prototype.removeItem;
     Storage.prototype.setItem = function (k, v) { ss.call(this, k, v); if (this === localStorage && !SKIP(k) && !applying) push(); };
     Storage.prototype.removeItem = function (k) { rs.call(this, k); if (this === localStorage && !SKIP(k) && !applying) push(); };
-    ref.onSnapshot(d => { if (d.metadata.hasPendingWrites || !d.exists) return; const x = d.data(); if (x.device !== DEVICE && x.data !== snap()) { apply(x.data); try { sessionStorage.__sync_pinskip = "1"; } catch (e2) {} location.reload(); } });
+    let firstSnap = true;
+    ref.onSnapshot(d => {
+      if (firstSnap) { firstSnap = false; return; }   // hozirgi holatni startSync allaqachon solishtirgan
+      if (d.metadata.hasPendingWrites || !d.exists) return;
+      const x = d.data();
+      if (x.device === DEVICE || canon(x.data) === snap()) return;
+      const now = Date.now(); let last = 0; try { last = +sessionStorage.__sync_rl || 0; } catch (e3) {}
+      if (now - last < 8000) return;                 // cheksiz qayta yuklanishdan himoya
+      try { sessionStorage.__sync_rl = String(now); sessionStorage.__sync_pinskip = "1"; } catch (e2) {}
+      apply(x.data); lastSync = canon(x.data); location.reload();
+    });
     return true;
   }
 
